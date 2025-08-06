@@ -3,14 +3,14 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
-import { config } from 'dotenv';
+import dotenv from 'dotenv';
 import path from 'path';
 import { errorHandler, notFoundHandler } from './middleware/errorMiddleware';
 import { requestLogging, metricsEndpoint, debugLogging } from './middleware/loggingMiddleware';
 
 
 // Configuration des variables d'environnement
-config();
+dotenv.config();
 
 // Types
 interface AppConfig {
