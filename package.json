@@ -1,0 +1,54 @@
+{
+  "name": "petites-annonces-ci-pro",
+  "version": "1.0.0",
+  "description": "Plateforme révolutionnaire de petites annonces pour la Côte d'Ivoire et l'Afrique de l'Ouest",
+  "private": true,
+  "workspaces": [
+    "backend",
+    "frontend",
+    "shared"
+  ],
+  "scripts": {
+    "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "dev:backend": "npm run dev --workspace=backend",
+    "dev:frontend": "npm run dev --workspace=frontend",
+    "build": "npm run build --workspace=backend && npm run build --workspace=frontend",
+    "test": "npm run test --workspace=backend && npm run test --workspace=frontend",
+    "lint": "npm run lint --workspace=backend && npm run lint --workspace=frontend",
+    "setup": "npm install && npm run setup:db",
+    "setup:db": "cd database && docker-compose up -d",
+    "docker:up": "docker-compose up -d",
+    "docker:down": "docker-compose down",
+    "deploy": "./scripts/deploy.sh"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2",
+    "@types/node": "^20.11.0",
+    "typescript": "^5.3.0",
+    "eslint": "^8.56.0",
+    "prettier": "^3.2.0"
+  },
+  "keywords": [
+    "petites-annonces",
+    "côte-d'ivoire",
+    "afrique",
+    "marketplace",
+    "e-commerce",
+    "nextjs",
+    "nodejs",
+    "typescript"
+  ],
+  "author": {
+    "name": "Votre Nom",
+    "email": "votre.email@example.com"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/votre-username/petites-annonces-ci-pro.git"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=9.0.0"
+  }
+}

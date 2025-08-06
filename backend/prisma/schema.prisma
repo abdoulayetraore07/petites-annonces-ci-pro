@@ -1,0 +1,561 @@
+// backend/prisma/schema.prisma
+// BASE DE DONNÉES RÉVOLUTIONNAIRE POUR PETITES ANNONCES CI
+
+generator client {
+  provider = "prisma-client-js"
+  previewFeatures = ["fullTextSearch", "fullTextIndex"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ==============================================
+// MODÈLE UTILISATEUR AVANCÉ
+// ==============================================
+model User {
+  id              String   @id @default(cuid())
+  email           String   @unique
+  phone           String   @unique
+  password        String
+  
+  // Informations personnelles
+  firstName       String
+  lastName        String
+  avatar          String?
+  dateOfBirth     DateTime?
+  gender          Gender?
+  
+  // Informations professionnelles
+  isProfessional  Boolean  @default(false)
+  companyName     String?
+  companyLogo     String?
+  storeLocation   String?
+  siret           String?
+  
+  // Géolocalisation
+  region          String?
+  commune         String?
+  quartier        String?
+  latitude        Float?
+  longitude       Float?
+  address         String?
+  
+  // Vérifications
+  emailVerified   Boolean  @default(false)
+  phoneVerified   Boolean  @default(false)
+  identityVerified Boolean @default(false)
+  
+  // Statut et sécurité
+  status          UserStatus @default(ACTIVE)
+  lastLoginAt     DateTime?
+  loginAttempts   Int      @default(0)
+  blockedUntil    DateTime?
+  twoFactorSecret String?
+  twoFactorEnabled Boolean @default(false)
+  
+  // Préférences
+  language        String   @default("fr")
+  currency        String   @default("XOF")
+  timezone        String   @default("Africa/Abidjan")
+  notifications   Json     @default("{\"email\": true, \"sms\": true, \"push\": true}")
+  
+  // Métadonnées
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  deletedAt       DateTime?
+  
+  // Relations
+  annonces        Annonce[]
+  favoris         Favori[]
+  messagesSent    Message[] @relation("MessageSender")
+  messagesReceived Message[] @relation("MessageReceiver")
+  avisGiven       Avis[]    @relation("AvisGiver")
+  avisReceived    Avis[]    @relation("AvisReceiver")
+  abonnements     Abonnement[]
+  vuesAnnonces    VueAnnonce[]
+  signalements    Signalement[]
+  paiements       Paiement[]
+  refreshTokens   RefreshToken[]
+  
+  @@map("users")
+  @@index([email])
+  @@index([phone])
+  @@index([region, commune])
+  @@index([isProfessional])
+  @@index([status])
+}
+
+enum Gender {
+  MALE
+  FEMALE
+  OTHER
+  PREFER_NOT_TO_SAY
+}
+
+enum UserStatus {
+  ACTIVE
+  SUSPENDED
+  DELETED
+  PENDING_VERIFICATION
+}
+
+// ==============================================
+// TOKENS DE RAFRAÎCHISSEMENT
+// ==============================================
+model RefreshToken {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  userId    String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@map("refresh_tokens")
+  @@index([token])
+  @@index([userId])
+}
+
+// ==============================================
+// MODÈLE ANNONCE ULTRA-AVANCÉ
+// ==============================================
+model Annonce {
+  id              String   @id @default(cuid())
+  
+  // Contenu de base
+  titre           String
+  description     String
+  prix            Float
+  devise          String   @default("XOF")
+  negociable      Boolean  @default(false)
+  
+  // Images et médias
+  images          Json     @default("[]")
+  videos          Json     @default("[]")
+  documents       Json     @default("[]")
+  
+  // Catégorisation
+  categorie       String
+  sousCategorie   String?
+  marque          String?
+  modele          String?
+  etat            EtatProduit?
+  
+  // Géolocalisation précise
+  region          String
+  commune         String
+  quartier        String?
+  latitude        Float?
+  longitude       Float?
+  adresseComplete String?
+  codePostal      String?
+  
+  // Contact
+  telephone       String?
+  whatsapp        String?
+  email           String?
+  siteWeb         String?
+  
+  // Propriétés spécifiques
+  proprietes      Json     @default("{}")  // Flexible pour chaque catégorie
+  
+  // Statistiques
+  vuesCount       Int      @default(0)
+  favorisCount    Int      @default(0)
+  messagesCount   Int      @default(0)
+  partagesCount   Int      @default(0)
+  
+  // SEO et recherche
+  slug            String   @unique
+  tags            String[]
+  motsCles        String?
+  
+  // Statut et gestion
+  statut          StatutAnnonce @default(BROUILLON)
+  premium         Boolean  @default(false)
+  promue          Boolean  @default(false)
+  urgente         Boolean  @default(false)
+  
+  // Dates importantes
+  datePublication DateTime?
+  dateExpiration  DateTime?
+  dateVente       DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  deletedAt       DateTime?
+  
+  // Propriétaire
+  userId          String
+  
+  // Relations
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  favoris         Favori[]
+  messages        Message[]
+  vues            VueAnnonce[]
+  signalements    Signalement[]
+  paiements       Paiement[]
+  
+  @@map("annonces")
+  @@index([categorie])
+  @@index([sousCategorie])
+  @@index([region, commune])
+  @@index([prix])
+  @@index([statut])
+  @@index([premium])
+  @@index([datePublication])
+  @@index([userId])
+  @@fulltext([titre, description, motsCles])
+}
+
+enum EtatProduit {
+  NEUF
+  TRES_BON_ETAT
+  BON_ETAT
+  ETAT_MOYEN
+  POUR_PIECES
+}
+
+enum StatutAnnonce {
+  BROUILLON
+  ACTIVE
+  VENDUE
+  EXPIREE
+  SUSPENDUE
+  SUPPRIMEE
+}
+
+// ==============================================
+// SYSTÈME DE FAVORIS
+// ==============================================
+model Favori {
+  id        String   @id @default(cuid())
+  userId    String
+  annonceId String
+  createdAt DateTime @default(now())
+  
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  annonce Annonce @relation(fields: [annonceId], references: [id], onDelete: Cascade)
+  
+  @@unique([userId, annonceId])
+  @@map("favoris")
+  @@index([userId])
+  @@index([annonceId])
+}
+
+// ==============================================
+// SYSTÈME DE MESSAGERIE TEMPS RÉEL
+// ==============================================
+model Message {
+  id          String      @id @default(cuid())
+  annonceId   String
+  senderId    String
+  receiverId  String
+  
+  contenu     String
+  type        TypeMessage @default(TEXT)
+  fichiers    Json        @default("[]")
+  
+  lu          Boolean     @default(false)
+  dateEnvoi   DateTime    @default(now())
+  dateLecture DateTime?
+  
+  // Relations
+  annonce  Annonce @relation(fields: [annonceId], references: [id], onDelete: Cascade)
+  sender   User    @relation("MessageSender", fields: [senderId], references: [id], onDelete: Cascade)
+  receiver User    @relation("MessageReceiver", fields: [receiverId], references: [id], onDelete: Cascade)
+  
+  @@map("messages")
+  @@index([annonceId])
+  @@index([senderId])
+  @@index([receiverId])
+  @@index([dateEnvoi])
+}
+
+enum TypeMessage {
+  TEXT
+  IMAGE
+  DOCUMENT
+  AUDIO
+  VIDEO
+  LOCATION
+}
+
+// ==============================================
+// SYSTÈME D'AVIS ET NOTATIONS
+// ==============================================
+model Avis {
+  id           String   @id @default(cuid())
+  userId       String   // Utilisateur évalué
+  evaluateurId String   // Utilisateur qui évalue
+  annonceId    String
+  
+  note         Int      // 1-5 étoiles
+  commentaire  String?
+  
+  // Critères détaillés
+  communication Int?     // 1-5
+  ponctualite   Int?     // 1-5
+  description   Int?     // 1-5
+  
+  createdAt    DateTime @default(now())
+  
+  // Relations
+  user        User    @relation("AvisReceiver", fields: [userId], references: [id], onDelete: Cascade)
+  evaluateur  User    @relation("AvisGiver", fields: [evaluateurId], references: [id], onDelete: Cascade)
+  
+  @@unique([userId, evaluateurId, annonceId])
+  @@map("avis")
+  @@index([userId])
+  @@index([note])
+}
+
+// ==============================================
+// SUIVI DES VUES (ANALYTICS)
+// ==============================================
+model VueAnnonce {
+  id        String   @id @default(cuid())
+  annonceId String
+  userId    String?  // null si utilisateur non connecté
+  
+  ipAddress    String?
+  userAgent    String?
+  referer      String?
+  dureeVisite  Int?     // en secondes
+  
+  createdAt DateTime @default(now())
+  
+  // Relations
+  annonce Annonce @relation(fields: [annonceId], references: [id], onDelete: Cascade)
+  user    User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+  
+  @@map("vues_annonces")
+  @@index([annonceId])
+  @@index([userId])
+  @@index([createdAt])
+}
+
+// ==============================================
+// SYSTÈME DE SIGNALEMENT
+// ==============================================
+model Signalement {
+  id          String         @id @default(cuid())
+  annonceId   String
+  userId      String
+  
+  motif       MotifSignalement
+  description String?
+  preuves     Json           @default("[]")
+  
+  statut      StatutSignalement @default(EN_ATTENTE)
+  
+  createdAt   DateTime       @default(now())
+  traitePar   String?
+  traiteAt    DateTime?
+  
+  // Relations
+  annonce Annonce @relation(fields: [annonceId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@map("signalements")
+  @@index([annonceId])
+  @@index([statut])
+}
+
+enum MotifSignalement {
+  CONTENU_INAPPROPRIE
+  FAUSSE_ANNONCE
+  PRIX_SUSPECT
+  SPAM
+  ARNAQUE
+  PRODUIT_ILLEGAL
+  AUTRE
+}
+
+enum StatutSignalement {
+  EN_ATTENTE
+  EN_COURS
+  TRAITE
+  REJETE
+}
+
+// ==============================================
+// SYSTÈME DE PAIEMENTS
+// ==============================================
+model Paiement {
+  id            String        @id @default(cuid())
+  userId        String
+  annonceId     String?       // Peut être null pour abonnements
+  
+  montant       Float
+  devise        String        @default("XOF")
+  type          TypePaiement
+  methode       MethodePaiement
+  
+  // Identifiants externes
+  stripeId      String?
+  orangeMoneyId String?
+  waveId        String?
+  
+  statut        StatutPaiement @default(EN_ATTENTE)
+  
+  // Métadonnées
+  metadata      Json          @default("{}")
+  
+  createdAt     DateTime      @default(now())
+  validatedAt   DateTime?
+  
+  // Relations
+  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  annonce Annonce? @relation(fields: [annonceId], references: [id], onDelete: SetNull)
+  
+  @@map("paiements")
+  @@index([userId])
+  @@index([statut])
+  @@index([type])
+}
+
+enum TypePaiement {
+  BOOST_ANNONCE
+  ANNONCE_PREMIUM
+  ABONNEMENT
+  COMMISSION_VENTE
+}
+
+enum MethodePaiement {
+  STRIPE
+  ORANGE_MONEY
+  WAVE
+  MOOV_MONEY
+  VIREMENT
+}
+
+enum StatutPaiement {
+  EN_ATTENTE
+  VALIDE
+  ECHOUE
+  REMBOURSE
+  ANNULE
+}
+
+// ==============================================
+// SYSTÈME D'ABONNEMENTS
+// ==============================================
+model Abonnement {
+  id         String           @id @default(cuid())
+  userId     String
+  
+  type       TypeAbonnement
+  prix       Float
+  devise     String           @default("XOF")
+  
+  dateDebut  DateTime
+  dateFin    DateTime
+  statut     StatutAbonnement @default(ACTIF)
+  
+  // Métadonnées
+  avantages  Json             @default("[]")
+  metadata   Json             @default("{}")
+  
+  createdAt  DateTime         @default(now())
+  
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@map("abonnements")
+  @@index([userId])
+  @@index([statut])
+  @@index([dateFin])
+}
+
+enum TypeAbonnement {
+  BASIC
+  PRO
+  PREMIUM
+  ENTERPRISE
+}
+
+enum StatutAbonnement {
+  ACTIF
+  EXPIRE
+  SUSPENDU
+  ANNULE
+}
+
+// ==============================================
+// RÉGIONS DE CÔTE D'IVOIRE
+// ==============================================
+model RegionCI {
+  id          String   @id @default(cuid())
+  nom         String   @unique
+  code        String   @unique
+  communes    Json     @default("[]")
+  quartiers   Json     @default("{}")
+  coordonnees Json?
+  population  Int?
+  superficie  Float?
+  
+  actif       Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@map("regions_ci")
+  @@index([nom])
+  @@index([code])
+}
+
+// ==============================================
+// CATÉGORIES DYNAMIQUES
+// ==============================================
+model Categorie {
+  id            String   @id @default(cuid())
+  nom           String   @unique
+  slug          String   @unique
+  description   String?
+  icone         String?
+  image         String?
+  couleur       String?
+  
+  parentId      String?
+  parent        Categorie? @relation("CategorieParent", fields: [parentId], references: [id])
+  sousCategories Categorie[] @relation("CategorieParent")
+  
+  // Propriétés spécifiques pour cette catégorie
+  champsPersonnalises Json @default("[]")
+  
+  ordre         Int      @default(0)
+  active        Boolean  @default(true)
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  @@map("categories")
+  @@index([slug])
+  @@index([parentId])
+  @@index([ordre])
+}
+
+// ==============================================
+// LOGS ET AUDIT
+// ==============================================
+model LogActivite {
+  id        String           @id @default(cuid())
+  userId    String?
+  
+  action    String
+  entite    String           // User, Annonce, etc.
+  entiteId  String
+  
+  details   Json             @default("{}")
+  ipAddress String?
+  userAgent String?
+  
+  createdAt DateTime         @default(now())
+  
+  @@map("logs_activite")
+  @@index([userId])
+  @@index([action])
+  @@index([entite, entiteId])
+  @@index([createdAt])
+}
