@@ -5,6 +5,9 @@ import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import { config } from 'dotenv';
 import path from 'path';
+import { errorHandler, notFoundHandler } from './middleware/errorMiddleware';
+import { requestLogging, metricsEndpoint, debugLogging } from './middleware/loggingMiddleware';
+
 
 // Configuration des variables d'environnement
 config();
@@ -166,6 +169,13 @@ app.get('/health', (req, res) => {
   });
 });
 
+app.use(debugLogging);           // Debug dev uniquement
+app.use(requestLogging({         // Logging principal
+  logBody: false,                // Corps requête (false prod)
+  slowRequestThreshold: 1000     // Seuil requête lente 1s
+}));
+
+
 // ==============================================
 // API ROUTES (À IMPLÉMENTER)
 // ==============================================
@@ -217,6 +227,8 @@ app.get('/api/annonces', (req, res) => {
 app.post('/api/annonces', (req, res) => {
   res.json({ message: 'Création d\'annonce - À implémenter' });
 });
+
+app.get('/metrics', metricsEndpoint);
 
 // ==============================================
 // GESTION DES FICHIERS STATIQUES
@@ -294,6 +306,10 @@ process.on('SIGINT', () => {
   console.log('🛑 Signal SIGINT reçu, arrêt du serveur...');
   process.exit(0);
 });
+
+
+app.use(notFoundHandler);    // Gère les routes 404
+app.use(errorHandler);       // Gère toutes les autres erreurs
 
 // Démarrage du serveur
 const server = app.listen(appConfig.port, () => {
